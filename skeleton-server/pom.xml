@@ -82,6 +82,7 @@
         <dependency>
             <groupId>io.airlift</groupId>
             <artifactId>openmetrics</artifactId>
+            <version>342-myfix-SNAPSHOT</version>
         </dependency>
 
         <dependency>
