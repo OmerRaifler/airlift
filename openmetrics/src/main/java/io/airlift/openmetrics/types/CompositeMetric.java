@@ -20,9 +20,9 @@ import javax.management.openmbean.CompositeType;
 import javax.management.openmbean.TabularData;
 import javax.management.openmbean.TabularType;
 
+import java.util.Collection;
 import java.util.List;
 import java.util.Map;
-import java.util.Collection;
 import java.util.Set;
 
 import static java.util.Objects.requireNonNull;
@@ -30,14 +30,16 @@ import static java.util.Objects.requireNonNull;
 public record CompositeMetric(String metricName, Map<String, String> labels, String help, List<Metric> subMetrics)
         implements Metric
 {
-    public static CompositeMetric from(String metricName, Object value, Map<String, String> labels, String help) {
+    public static CompositeMetric from(String metricName, Object value, Map<String, String> labels, String help)
+    {
         requireNonNull(value, "value is null");
         ImmutableList.Builder<Metric> subMetrics = ImmutableList.builder();
         traverseObject(metricName, value, labels, help, subMetrics);
         return new CompositeMetric(metricName, labels, help, subMetrics.build());
     }
 
-    private static void traverseObject(String prefix, Object value, Map<String, String> labels, String help, ImmutableList.Builder<Metric> metrics) {
+    private static void traverseObject(String prefix, Object value, Map<String, String> labels, String help, ImmutableList.Builder<Metric> metrics)
+    {
         if (value == null) {
             return;
         }
@@ -66,7 +68,7 @@ public record CompositeMetric(String metricName, Map<String, String> labels, Str
             TabularType tabularType = tabularData.getTabularType();
             List<String> indexNames = tabularType.getIndexNames();
             CompositeType rowType = tabularType.getRowType();
-            
+
             Collection<?> values = tabularData.values();
             for (Object entry : values) {
                 if (entry instanceof CompositeData compositeData) {
@@ -86,7 +88,8 @@ public record CompositeMetric(String metricName, Map<String, String> labels, Str
     }
 
     @Override
-    public String getMetricExposition() {
+    public String getMetricExposition()
+    {
         StringBuilder exposition = new StringBuilder();
         if (help != null && !help.isEmpty()) {
             exposition.append(Metric.HELP_LINE_FORMAT.formatted(metricName, help));

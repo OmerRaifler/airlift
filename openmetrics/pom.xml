@@ -9,6 +9,8 @@
     </parent>
 
     <artifactId>openmetrics</artifactId>
+
+    <version>343-myfix-SNAPSHOT</version>
     <packaging>jar</packaging>
     <name>openmetrics</name>
     <description>Airlift - OpenMetrics support</description>
