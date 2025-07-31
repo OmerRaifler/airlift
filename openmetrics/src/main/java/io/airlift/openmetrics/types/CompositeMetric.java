@@ -24,6 +24,7 @@ import java.util.Collection;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.HashMap;
 
 import static java.util.Objects.requireNonNull;
 
@@ -40,50 +41,49 @@ public record CompositeMetric(String metricName, Map<String, String> labels, Str
 
     private static void traverseObject(String prefix, Object value, Map<String, String> labels, String help, ImmutableList.Builder<Metric> metrics)
     {
-        if (value == null) {
-            return;
-        }
-
-        if (value instanceof Number number) {
-            metrics.add(new Gauge(prefix, number.doubleValue(), labels, help));
-            return;
-        }
-
-        if (value instanceof Boolean bool) {
-            metrics.add(new Gauge(prefix, bool ? 1.0 : 0.0, labels, help));
-            return;
-        }
-
-        if (value instanceof CompositeData compositeData) {
-            CompositeType compositeType = compositeData.getCompositeType();
-            Set<String> itemNames = compositeType.keySet();
-            for (String itemName : itemNames) {
-                Object itemValue = compositeData.get(itemName);
-                traverseObject(prefix + "_" + itemName, itemValue, labels, help, metrics);
-            }
-            return;
-        }
-
-        if (value instanceof TabularData tabularData) {
-            TabularType tabularType = tabularData.getTabularType();
-            List<String> indexNames = tabularType.getIndexNames();
-            CompositeType rowType = tabularType.getRowType();
-
-            Collection<?> values = tabularData.values();
-            for (Object entry : values) {
-                if (entry instanceof CompositeData compositeData) {
-                    // Build a meaningful prefix using the index values
-                    StringBuilder entryPrefix = new StringBuilder(prefix);
-                    for (String indexName : indexNames) {
-                        Object indexValue = compositeData.get(indexName);
-                        if (indexValue != null) {
-                            entryPrefix.append("_").append(indexValue);
-                        }
-                    }
-                    traverseObject(entryPrefix.toString(), compositeData, labels, help, metrics);
+        switch (value) {
+            case Number number -> metrics.add(new Gauge(prefix, number.doubleValue(), labels, help));
+            case Boolean bool -> metrics.add(new Gauge(prefix, bool ? 1.0 : 0.0, labels, help));
+            case CompositeData compositeData -> {
+                CompositeType compositeType = compositeData.getCompositeType();
+                Set<String> itemNames = compositeType.keySet();
+                for (String itemName : itemNames) {
+                    Object itemValue = compositeData.get(itemName);
+                    traverseObject(prefix + "_" + itemName, itemValue, labels, help, metrics);
                 }
             }
-            return;
+            case TabularData tabularData -> {
+                TabularType tabularType = tabularData.getTabularType();
+                List<String> indexNames = tabularType.getIndexNames();
+
+                Collection<?> values = tabularData.values();
+                if (values == null || values.isEmpty()) {
+                    return;
+                }
+
+                for (Object entry : values) {
+                    if (entry instanceof CompositeData compositeData) {
+                        Map<String, String> rowLabels = new HashMap<>(labels);
+                        for (String indexName : indexNames) {
+                            Object indexValue = compositeData.get(indexName);
+                            if (indexValue != null) {
+                                rowLabels.put(indexName, indexValue.toString());
+                            }
+                        }
+
+                        CompositeType compositeType = compositeData.getCompositeType();
+                        Set<String> itemNames = compositeType.keySet();
+                        for (String itemName : itemNames) {
+                            if (indexNames.contains(itemName)) {
+                                continue;
+                            }
+                            Object itemValue = compositeData.get(itemName);
+                            traverseObject(prefix + "_" + itemName, itemValue, rowLabels, help, metrics);
+                        }
+                    }
+                }
+            }
+            default -> throw new IllegalStateException("Unexpected value: " + value);
         }
     }
 
@@ -91,12 +91,10 @@ public record CompositeMetric(String metricName, Map<String, String> labels, Str
     public String getMetricExposition()
     {
         StringBuilder exposition = new StringBuilder();
-        if (help != null && !help.isEmpty()) {
-            exposition.append(Metric.HELP_LINE_FORMAT.formatted(metricName, help));
-        }
         for (Metric subMetric : subMetrics) {
             exposition.append(subMetric.getMetricExposition());
         }
         return exposition.toString();
     }
 }
+
