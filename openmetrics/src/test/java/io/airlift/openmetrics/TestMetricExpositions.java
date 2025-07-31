@@ -27,6 +27,9 @@ import javax.management.openmbean.CompositeDataSupport;
 import javax.management.openmbean.CompositeType;
 import javax.management.openmbean.OpenType;
 import javax.management.openmbean.SimpleType;
+import javax.management.openmbean.TabularData;
+import javax.management.openmbean.TabularDataSupport;
+import javax.management.openmbean.TabularType;
 
 import java.math.BigInteger;
 import java.util.HashMap;
@@ -148,7 +151,6 @@ public class TestMetricExpositions
     public void testCompositeMetricExposition()
     {
         String expected = """
-                # HELP metric_name metric_help
                 # TYPE metric_name_committed gauge
                 # HELP metric_name_committed metric_help
                 metric_name_committed 200.0
@@ -169,7 +171,6 @@ public class TestMetricExpositions
     public void testCompositeMetricExpositionLabels()
     {
         String expected = """
-                # HELP metric_name metric_help
                 # TYPE metric_name_committed gauge
                 # HELP metric_name_committed metric_help
                 metric_name_committed{type="cavendish"} 200.0
@@ -199,6 +200,66 @@ public class TestMetricExpositions
             values.put("max", max);
 
             return new CompositeDataSupport(compositeType, values);
+        } catch (Exception e) {
+            throw new RuntimeException(e);
+        }
+    }
+
+    @Test
+    public void testTabularDataExposition()
+    {
+        String expected = """
+                # TYPE metric_name_value gauge
+                # HELP metric_name_value metric_help
+                metric_name_value{region="us-east",zone="1a"} 100.0
+                metric_name_value{region="us-west",zone="2b"} 200.0
+                """;
+
+        TabularData tabularData = createTestTabularData();
+        CompositeMetric compositeMetric = CompositeMetric.from("metric_name", tabularData, ImmutableMap.of(), "metric_help");
+        assertThat(compositeMetric.getMetricExposition()).isEqualTo(expected);
+    }
+
+    @Test
+    public void testTabularDataExpositionLabels()
+    {
+        String expected = """
+                # TYPE metric_name_value gauge
+                # HELP metric_name_value metric_help
+                metric_name_value{region="us-east",type="cavendish",zone="1a"} 100.0
+                metric_name_value{region="us-west",type="cavendish",zone="2b"} 200.0
+                """;
+
+        TabularData tabularData = createTestTabularData();
+        CompositeMetric compositeMetric = CompositeMetric.from("metric_name", tabularData, ImmutableMap.of("type", "cavendish"), "metric_help");
+        assertThat(compositeMetric.getMetricExposition()).isEqualTo(expected);
+    }
+
+    private TabularData createTestTabularData()
+    {
+        try {
+            String[] itemNames = {"region", "zone", "value"};
+            OpenType<?>[] itemTypes = {SimpleType.STRING, SimpleType.STRING, SimpleType.LONG};
+            CompositeType compositeType = new CompositeType("TestData", "Test Data", itemNames, itemNames, itemTypes);
+
+            String[] indexNames = {"region", "zone"};
+            TabularType tabularType = new TabularType("TestTable", "Test Table", compositeType, indexNames);
+
+            TabularDataSupport tabularData = new TabularDataSupport(tabularType);
+
+            Map<String, Object> row1 = new HashMap<>();
+            row1.put("region", "us-east");
+            row1.put("zone", "1a");
+            row1.put("value", 100L);
+            tabularData.put(new CompositeDataSupport(compositeType, row1));
+
+            Map<String, Object> row2 = new HashMap<>();
+            row2.put("region", "us-west");
+            row2.put("zone", "2b");
+            row2.put("value", 200L);
+            tabularData.put(new CompositeDataSupport(compositeType, row2));
+
+            return tabularData;
         } catch (Exception e) {
             throw new RuntimeException(e);
         }
